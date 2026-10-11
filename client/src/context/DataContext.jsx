@@ -1,60 +1,100 @@
-import { createContext, useState, useContext } from 'react';
+import { createContext, useState, useContext, useEffect } from 'react';
+import { api } from '../api';
 
 const DataContext = createContext();
 
-// This custom hook must be exported
 export const useData = () => useContext(DataContext);
 
-// The Provider component must be exported
 export const DataProvider = ({ children }) => {
-    const [projects, setProjects] = useState([
-        { id: 'capstone-2', name: 'Capstone 2', theme: 'yellow' },
-        { id: 'advanced-web', name: 'Advanced Web Final Project', theme: 'rose' }
-    ]);
+    const [projects, setProjects] = useState([]);
+    const [tasks, setTasks] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    const [tasks, setTasks] = useState([
-        { 
-            id: '1', 
-            name: 'Layout Figma', 
-            status: 'Not Started', 
-            project: 'Capstone 2',
-            startDate: '2026-10-05',
-            dueDate: '2026-10-12', 
-            tags: ['Design', 'Frontend'], 
-            priority: 'High'
-        },
-        { 
-            id: '2', 
-            name: 'Code Dashboard', 
-            status: 'In Progress', 
-            project: 'Advanced Web Final Project',
-            startDate: '2026-10-05',
-            dueDate: '2026-10-14', 
-            tags: ['Frontend'],
-            priority: 'High'
+    useEffect(() => {
+        const load = async () => {
+            if (!localStorage.getItem('token')) {
+                setLoading(false);
+                return;
+            }
+            try {
+                const [p, t] = await Promise.all([
+                    api('/api/projects'),
+                    api('/api/tasks'),
+                ]);
+                setProjects(p);
+                setTasks(t);
+            } catch (err) {
+                console.error(err.message);
+            } finally {
+                setLoading(false);
+            }
+        };
+        load();
+    }, []);
+
+    const handleAddProject = async (newProject) => {
+        try {
+            const saved = await api('/api/projects', {
+                method: 'POST',
+                body: JSON.stringify(newProject),
+            });
+            setProjects(prev => [...prev, saved]);
+        } catch (err) {
+            alert(err.message);
         }
-    ]);
+    };
 
-    const handleAddProject = (newProject) => setProjects(prev => [...prev, newProject]);
-    const handleAddTask = (newTask) => setTasks(prev => [...prev, newTask]);
-    const handleUpdateTask = (updatedTask) => {
-        setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
+    const handleAddTask = async (newTask) => {
+        try {
+            const saved = await api('/api/tasks', {
+                method: 'POST',
+                body: JSON.stringify(newTask),
+            });
+            setTasks(prev => [...prev, saved]);
+        } catch (err) {
+            alert(err.message);
+        }
     };
-    const handleDeleteTask = (taskId) => {
-        setTasks(prev => prev.filter(task => task.id !== taskId));
+
+    const handleUpdateTask = async (updatedTask) => {
+        try {
+            const saved = await api(`/api/tasks/${updatedTask.id}`, {
+                method: 'PUT',
+                body: JSON.stringify(updatedTask),
+            });
+            setTasks(prev => prev.map(t => (t.id === saved.id ? saved : t)));
+        } catch (err) {
+            alert(err.message);
+        }
     };
-    const handleDeleteProject = (projectId) => {
+
+    const handleDeleteTask = async (taskId) => {
+        try {
+            await api(`/api/tasks/${taskId}`, { method: 'DELETE' });
+            setTasks(prev => prev.filter(task => task.id !== taskId));
+        } catch (err) {
+            alert(err.message);
+        }
+    };
+
+    const handleDeleteProject = async (projectId) => {
         const project = projects.find(item => item.id === projectId);
         if (!project) return;
 
-        setProjects(prev => prev.filter(item => item.id !== projectId));
-        setTasks(prev => prev.filter(task => task.project !== project.name));
+        try {
+            await api(`/api/projects/${projectId}`, { method: 'DELETE' });
+            setProjects(prev => prev.filter(item => item.id !== projectId));
+            setTasks(prev => prev.filter(task => task.project !== project.name));
+        } catch (err) {
+            alert(err.message);
+        }
     };
 
     return (
         <DataContext.Provider value={{ 
             projects, handleAddProject, 
-            tasks, handleAddTask, handleUpdateTask, handleDeleteTask, handleDeleteProject
+            tasks, handleAddTask, handleUpdateTask, handleDeleteTask, handleDeleteProject,
+            loading
         }}>
             {children}
         </DataContext.Provider>
