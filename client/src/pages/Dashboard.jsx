@@ -23,7 +23,7 @@ export default function Dashboard() {
     const [createModalInitialStatus, setCreateModalInitialStatus] = useState('Not Started');
 
     const [selectedTaskId, setSelectedTaskId] = useState(null);
-    const { tasks, handleAddTask, handleUpdateTask, handleDeleteTask } = useData();
+    const { projects, tasks, handleAddTask, handleUpdateTask, handleDeleteTask } = useData();
 
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
