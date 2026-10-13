@@ -5,6 +5,7 @@ import Projects from './pages/Projects';
 import Tasks from './pages/Tasks';
 import CalendarView from './pages/Calendar';
 import Settings from './pages/Settings';
+import ResetPassword from './pages/ResetPassword';
 
 import { DataProvider } from './context/DataContext';
 import { Navigate, Outlet } from 'react-router-dom';
@@ -26,6 +27,7 @@ export default function App() {
             <Route path="/calendar" element={<CalendarView />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/projects/:projectId" element={<Projects />} />
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
           </Route>
         </Routes>
       </Router>
