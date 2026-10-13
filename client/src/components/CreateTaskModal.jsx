@@ -28,13 +28,14 @@ export default function CreateTaskModal({
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSubmit = (e) => {
+    const [saving, setSaving] = useState(false);
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
         
         const tags = formData.category.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
 
         const newTask = {
-            id: Date.now().toString(),
             name: formData.name,
             description: formData.description,
             status: formData.status,
@@ -45,8 +46,13 @@ export default function CreateTaskModal({
             tags: tags.length > 0 ? tags : ['General']
         };
 
-        onAddTask(newTask);
-        onClose();
+        setSaving(true);
+        try {
+            const savedTask = await onAddTask(newTask);
+            if (savedTask) onClose();
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -115,7 +121,7 @@ export default function CreateTaskModal({
 
                     <div className="pt-4 flex justify-end gap-3 border-t border-slate-100 mt-6">
                         <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
-                        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-emerald-400 hover:bg-emerald-500 rounded-lg transition-colors">Create Task</button>
+                        <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-emerald-400 hover:bg-emerald-500 rounded-lg transition-colors disabled:opacity-60">{saving ? 'Saving...' : 'Create Task'}</button>
                     </div>
                 </form>
             </div>

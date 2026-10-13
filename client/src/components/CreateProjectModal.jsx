@@ -16,22 +16,26 @@ export default function CreateProjectModal({ onClose, onCreateProject }) {
         { id: 'purple', name: 'Purple', colorClass: 'bg-purple-500' },
     ];
 
-    const handleSubmit = (e) => {
+    const [saving, setSaving] = useState(false);
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
         
         if (!formData.name.trim()) return;
 
-        const newId = formData.name.toLowerCase().replace(/\s+/g, '-');
-        
         const newProject = {
-            id: newId,
             name: formData.name.trim(),
             description: formData.description.trim() || 'New workspace',
             theme: formData.theme
         };
 
-        onCreateProject(newProject);
-        onClose();
+        setSaving(true);
+        try {
+            const savedProject = await onCreateProject(newProject);
+            if (savedProject) onClose();
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -94,9 +98,10 @@ export default function CreateProjectModal({ onClose, onCreateProject }) {
                         </button>
                         <button 
                             type="submit"
+                            disabled={saving}
                             className="px-4 py-2 text-sm font-medium text-white bg-emerald-400 hover:bg-emerald-500 rounded-lg transition-colors"
                         >
-                            Create Project
+                            {saving ? 'Saving...' : 'Create Project'}
                         </button>
                     </div>
                 </form>

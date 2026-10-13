@@ -1,4 +1,4 @@
-import { createContext, useState, useContext, useEffect } from 'react';
+import { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { api } from '../api';
 
 const DataContext = createContext();
@@ -10,27 +10,35 @@ export const DataProvider = ({ children }) => {
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const load = async () => {
-            if (!localStorage.getItem('token')) {
-                setLoading(false);
-                return;
-            }
-            try {
-                const [p, t] = await Promise.all([
-                    api('/api/projects'),
-                    api('/api/tasks'),
-                ]);
-                setProjects(p);
-                setTasks(t);
-            } catch (err) {
-                console.error(err.message);
-            } finally {
-                setLoading(false);
-            }
-        };
-        load();
+    const clearData = useCallback(() => {
+        setProjects([]);
+        setTasks([]);
     }, []);
+
+    const loadData = useCallback(async () => {
+        if (!localStorage.getItem('token')) {
+            clearData();
+            setLoading(false);
+            return;
+        }
+        setLoading(true);
+        try {
+            const [p, t] = await Promise.all([
+                api('/api/projects'),
+                api('/api/tasks'),
+            ]);
+            setProjects(p);
+            setTasks(t);
+        } catch (err) {
+            console.error('Failed to load data:', err.message);
+        } finally {
+            setLoading(false);
+        }
+    }, [clearData]);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
 
     const handleAddProject = async (newProject) => {
         try {
@@ -39,8 +47,10 @@ export const DataProvider = ({ children }) => {
                 body: JSON.stringify(newProject),
             });
             setProjects(prev => [...prev, saved]);
+            return saved;
         } catch (err) {
-            alert(err.message);
+            alert(`Unable to save project: ${err.message}`);
+            return null;
         }
     };
 
@@ -51,8 +61,10 @@ export const DataProvider = ({ children }) => {
                 body: JSON.stringify(newTask),
             });
             setTasks(prev => [...prev, saved]);
+            return saved;
         } catch (err) {
-            alert(err.message);
+            alert(`Unable to save task: ${err.message}`);
+            return null;
         }
     };
 
@@ -91,10 +103,10 @@ export const DataProvider = ({ children }) => {
     };
 
     return (
-        <DataContext.Provider value={{ 
-            projects, handleAddProject, 
+        <DataContext.Provider value={{
+            projects, handleAddProject,
             tasks, handleAddTask, handleUpdateTask, handleDeleteTask, handleDeleteProject,
-            loading
+            loading, loadData, clearData
         }}>
             {children}
         </DataContext.Provider>

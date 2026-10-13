@@ -10,7 +10,7 @@ export default function Sidebar({ isMobileMenuOpen, onMobileMenuClose }) {
     const navigate = useNavigate();
 
     // Pull global projects and the add function from Context
-    const { projects, handleAddProject } = useData();
+    const { projects, handleAddProject, clearData } = useData();
 
     const [isProjectsExpanded, setIsProjectsExpanded] = useState(true);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -33,15 +33,22 @@ export default function Sidebar({ isMobileMenuOpen, onMobileMenuClose }) {
     ];
 
     const confirmLogout = () => {
-        localStorage.removeItem('isLoggedIn');
-        navigate('/');
+        // Logging out clears only local session information; MongoDB data remains intact.
+        ['token', 'isLoggedIn', 'userName', 'userEmail'].forEach((key) =>
+            localStorage.removeItem(key)
+        );
+        clearData();
+        navigate('/', { replace: true });
     };
 
-    const onCreateProject = (newProject) => {
-        handleAddProject(newProject); // Adds to global state
+    const onCreateProject = async (newProject) => {
+        const savedProject = await handleAddProject(newProject);
+        if (!savedProject) return null;
+
         setIsCreateProjectModalOpen(false);
         if (!isProjectsExpanded) setIsProjectsExpanded(true);
-        navigate(`/projects/${newProject.id}`);
+        navigate(`/projects/${savedProject.id}`);
+        return savedProject;
     };
 
     return (

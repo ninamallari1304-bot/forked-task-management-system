@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Eye, EyeOff } from 'lucide-react';
 import moodleLogo from '../assets/moodle-logo.png';
 import { api } from '../api';
+import { useData } from '../context/DataContext';
 
 export default function LoginModal({ onClose, switchToRegister, switchToForgotPassword }) {
     const [showPassword, setShowPassword] = useState(false);
