@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import User from "../models/User.js";
 import sendEmail from "../utils/sendEmail.js";
+import { getResetClientUrl } from "../utils/resetClientUrl.js";
 
 const signToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
@@ -64,12 +65,12 @@ export const forgotPassword = async (req, res) => {
     user.resetPasswordExpires = new Date(Date.now() + 15 * 60 * 1000);
     await user.save();
 
-    const clientUrl = process.env.CLIENT_URL?.trim().replace(/\/+$/, "");
+    const clientUrl = getResetClientUrl();
     if (!clientUrl) {
       user.resetPasswordToken = undefined;
       user.resetPasswordExpires = undefined;
       await user.save();
-      console.error("Forgot password email not sent: CLIENT_URL is not configured");
+      console.error("Forgot password email not sent: configure a valid PASSWORD_RESET_URL or CLIENT_URL");
       return res.status(500).json({ message: "Password reset is temporarily unavailable. Please try again later." });
     }
 

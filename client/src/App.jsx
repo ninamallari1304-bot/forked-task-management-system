@@ -20,6 +20,7 @@ export default function App() {
       <Router>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route element={<ProtectedRoutes />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/projects" element={<Projects />} />
@@ -27,7 +28,6 @@ export default function App() {
             <Route path="/calendar" element={<CalendarView />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/projects/:projectId" element={<Projects />} />
-            <Route path="/reset-password/:token" element={<ResetPassword />} />
           </Route>
         </Routes>
       </Router>
