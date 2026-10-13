@@ -3,7 +3,6 @@ import crypto from "crypto";
 import User from "../models/User.js";
 import sendEmail from "../utils/sendEmail.js";
 
-
 const signToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
@@ -16,55 +15,93 @@ export const register = async (req, res) => {
     if (!name || !email || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
-    if (await User.findOne({ email })) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (await User.findOne({ email: normalizedEmail })) {
       return res.status(400).json({ message: "Email already in use" });
     }
-    const user = await User.create({ name, email, password });
+    const user = await User.create({ name: name.trim(), email: normalizedEmail, password });
     res.status(201).json({ token: signToken(user._id), user: userData(user) });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: "Unable to register account" });
   }
 };
 
 // POST /api/auth/login
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email }).select("+password");
-    if (!user || !(await user.matchPassword(password))) {
+    const email = req.body.email?.trim().toLowerCase();
+    const { password } = req.body;
+    const user = email ? await User.findOne({ email }).select("+password") : null;
+    if (!user || typeof password !== "string" || !(await user.matchPassword(password))) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
     res.json({ token: signToken(user._id), user: userData(user) });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: "Unable to log in" });
   }
 };
 
 // POST /api/auth/forgot-password
 export const forgotPassword = async (req, res) => {
+  const genericMessage = "If an account exists for that email, a reset link has been sent.";
+
   try {
-    const email = req.body.email?.toLowerCase().trim();
-    const user = email ? await User.findOne({ email }) : null;
+    const email = typeof req.body.email === "string"
+      ? req.body.email.trim().toLowerCase()
+      : "";
 
-    if (user) {
-      const token = crypto.randomBytes(32).toString("hex");
-      user.resetPasswordToken = crypto.createHash("sha256").update(token).digest("hex");
-      user.resetPasswordExpires = Date.now() + 5 * 60 * 1000; 
+    if (!email) {
+      return res.status(400).json({ message: "Please enter your email address" });
+    }
+
+    const user = await User.findOne({ email });
+
+    // Always return the same success message for existing and non-existing emails.
+    if (!user) return res.json({ message: genericMessage });
+
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    user.resetPasswordToken = crypto.createHash("sha256").update(rawToken).digest("hex");
+    user.resetPasswordExpires = new Date(Date.now() + 15 * 60 * 1000);
+    await user.save();
+
+    const clientUrl = process.env.CLIENT_URL?.trim().replace(/\/+$/, "");
+    if (!clientUrl) {
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpires = undefined;
       await user.save();
+      console.error("Forgot password email not sent: CLIENT_URL is not configured");
+      return res.status(500).json({ message: "Password reset is temporarily unavailable. Please try again later." });
+    }
 
-      const link = `${process.env.CLIENT_URL}/reset-password/${token}`;
-      console.log("Reset link:", link); 
-
+    const resetUrl = `${clientUrl}/reset-password/${rawToken}`;
+    try {
       await sendEmail({
         to: user.email,
-        subject: "Reset your password",
-        html: `<p>Click the link below to reset your password. It expires in 5 minutes.</p>
-               <p><a href="${link}">${link}</a></p>`,
+        subject: "Reset your Task Manager password",
+        html: `
+          <div style="font-family:Arial,sans-serif;line-height:1.6;color:#1e293b;max-width:560px;margin:auto">
+            <h2>Reset your password</h2>
+            <p>We received a request to reset the password for your Task Manager account.</p>
+            <p><a href="${resetUrl}" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none">Reset password</a></p>
+            <p>This link expires in 15 minutes and can only be used once.</p>
+            <p>If you did not request this, you can ignore this email.</p>
+          </div>`,
+        text: `Reset your Task Manager password: ${resetUrl}\nThis link expires in 15 minutes and can only be used once. If you did not request this, ignore this email.`,
       });
+    } catch (emailError) {
+      // Do not leave a usable token behind if delivery failed.
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpires = undefined;
+      await user.save();
+      console.error("Forgot password email delivery failed:", emailError.message);
+      return res.status(500).json({ message: "Unable to send the reset email right now. Please try again later." });
     }
-    res.json({ message: "If that email exists, a reset link has been sent." });
+
+    // Never log the raw reset token or reset URL.
+    return res.json({ message: genericMessage });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("Forgot password request failed:", err.message);
+    return res.status(500).json({ message: "Unable to process your request right now. Please try again later." });
   }
 };
 
@@ -72,30 +109,36 @@ export const forgotPassword = async (req, res) => {
 export const resetPassword = async (req, res) => {
   try {
     const { password } = req.body;
-    if (!password || password.length < 6) {
+    if (typeof password !== "string" || password.length < 6) {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
     }
 
-    const hashedToken = crypto.createHash("sha256").update(req.params.token).digest("hex");
-    const user = await User.findOne({
-      resetPasswordToken: hashedToken,
-      resetPasswordExpires: { $gt: Date.now() },
-    });
-    if (!user) {
+    const rawToken = req.params.token;
+    if (!rawToken || !/^[a-f0-9]{64}$/i.test(rawToken)) {
       return res.status(400).json({ message: "Reset link is invalid or has expired" });
     }
 
-    user.password = password; 
+    const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Reset link is invalid or has expired. Please request a new one." });
+    }
+
+    user.password = password;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     await user.save();
 
-    res.json({ message: "Password updated successfully" });
+    return res.json({ message: "Password updated successfully. You can now log in with your new password." });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("Reset password failed:", err.message);
+    return res.status(500).json({ message: "Unable to reset your password right now. Please try again later." });
   }
 };
 
 // GET /api/auth/me
 export const getMe = (req, res) => res.json(userData(req.user));
-
