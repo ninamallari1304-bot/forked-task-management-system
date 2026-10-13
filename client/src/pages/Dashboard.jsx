@@ -137,7 +137,7 @@ export default function Dashboard() {
 
                     <div className="px-4 sm:px-6 lg:px-10 mb-8">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-                            <StatCard icon={FileText} value="2" label="Active Projects" onClick={() => navigate('/projects')} />
+                            <StatCard icon={FileText} value={projects.length} label="Active Projects" onClick={() => navigate('/projects')} />
                             <StatCard icon={ListTodo} value={tasks.length} label="Number of Tasks" onClick={() => navigate('/tasks')} />
                             <StatCard icon={CheckSquare} value={`${overallPercentage}%`} label="Target Completed" onClick={() => setIsDetailsModalOpen(true)} />
                         </div>

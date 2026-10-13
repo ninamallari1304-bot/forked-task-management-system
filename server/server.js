@@ -8,7 +8,14 @@ import taskRoutes from "./routes/taskRoutes.js";
 
 const app = express();
 
-app.use(cors({ origin: process.env.CLIENT_URL }));
+const allowedOrigins = (process.env.CLIENT_URL || "")
+  .split(",")
+  .map((url) => url.trim().replace(/^["']|["']$/g, "").replace(/\/+$/, ""))
+  .filter(Boolean);
+
+console.log("Allowed origins:", allowedOrigins.length ? allowedOrigins : "(any, CLIENT_URL is empty)");
+
+app.use(cors({ origin: allowedOrigins.length ? allowedOrigins : true }));
 app.use(express.json());
 
 app.get("/", (req, res) => res.send("API is running"));
